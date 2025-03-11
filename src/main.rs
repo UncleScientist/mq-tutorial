@@ -1,6 +1,12 @@
 use macroquad::prelude::*;
+use rand::ChooseRandom;
 
 const MOVEMENT_SPEED: f32 = 200.0;
+
+const COLOR_LIST: [Color; 22] = [
+    LIGHTGRAY, GRAY, DARKGRAY, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE,
+    BLUE, DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK, MAGENTA,
+];
 
 #[macroquad::main("My game")]
 async fn main() {
@@ -10,6 +16,7 @@ async fn main() {
         speed: MOVEMENT_SPEED,
         x: screen_width() / 2.,
         y: screen_height() / 2.,
+        color: YELLOW,
     };
 
     rand::srand(miniquad::date::now() as u64);
@@ -25,6 +32,7 @@ async fn main() {
                 speed: rand::gen_range(50.0, 150.0),
                 x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
                 y: -size,
+                color: *COLOR_LIST.choose().unwrap(),
             });
         }
 
@@ -58,11 +66,11 @@ async fn main() {
                 square.y - square.size / 2.0,
                 square.size,
                 square.size,
-                GREEN,
+                square.color,
             );
         }
 
-        draw_circle(circle.x, circle.y, 16.0, YELLOW);
+        draw_circle(circle.x, circle.y, 16.0, circle.color);
 
         next_frame().await
     }
@@ -73,4 +81,5 @@ struct Shape {
     speed: f32,
     x: f32,
     y: f32,
+    color: Color,
 }
