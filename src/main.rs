@@ -10,6 +10,7 @@ const COLOR_LIST: [Color; 22] = [
 
 #[macroquad::main("My game")]
 async fn main() {
+    let mut gameover = false;
     let mut squares = vec![];
     let mut circle = Shape {
         size: 32.0,
@@ -25,40 +26,52 @@ async fn main() {
         let delta_time = get_frame_time();
         let circle_movement = MOVEMENT_SPEED * delta_time;
 
-        if rand::gen_range(0, 99) >= 95 {
-            let size = rand::gen_range(16.0, 64.0);
-            squares.push(Shape {
-                size,
-                speed: rand::gen_range(50.0, 150.0),
-                x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
-                y: -size,
-                color: *COLOR_LIST.choose().unwrap(),
-            });
+        if !gameover {
+            if rand::gen_range(0, 99) >= 95 {
+                let size = rand::gen_range(16.0, 64.0);
+                squares.push(Shape {
+                    size,
+                    speed: rand::gen_range(50.0, 150.0),
+                    x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
+                    y: -size,
+                    color: *COLOR_LIST.choose().unwrap(),
+                });
+            }
+
+            if is_key_down(KeyCode::Right) {
+                circle.x += circle_movement;
+            }
+            if is_key_down(KeyCode::Left) {
+                circle.x -= circle_movement;
+            }
+            if is_key_down(KeyCode::Down) {
+                circle.y += circle_movement;
+            }
+            if is_key_down(KeyCode::Up) {
+                circle.y -= circle_movement;
+            }
+
+            circle.x = clamp(circle.x, 0.0, screen_width());
+            circle.y = clamp(circle.y, 0.0, screen_height());
+
+            for square in &mut squares {
+                square.y += square.speed * delta_time;
+            }
+
+            squares.retain(|square| square.y < screen_height() + square.size);
+
+            gameover = squares.iter().any(|square| circle.collides_with(square));
         }
 
+        if gameover && is_key_pressed(KeyCode::Space) {
+            squares.clear();
+            circle.x = screen_width() / 2.0;
+            circle.y = screen_height() / 2.0;
+            gameover = false;
+        }
+
+        /* draw stuff from here on down */
         clear_background(DARKPURPLE);
-
-        if is_key_down(KeyCode::Right) {
-            circle.x += circle_movement;
-        }
-        if is_key_down(KeyCode::Left) {
-            circle.x -= circle_movement;
-        }
-        if is_key_down(KeyCode::Down) {
-            circle.y += circle_movement;
-        }
-        if is_key_down(KeyCode::Up) {
-            circle.y -= circle_movement;
-        }
-
-        circle.x = clamp(circle.x, 0.0, screen_width());
-        circle.y = clamp(circle.y, 0.0, screen_height());
-
-        for square in &mut squares {
-            square.y += square.speed * delta_time;
-        }
-
-        squares.retain(|square| square.y < screen_height() + square.size);
 
         for square in &squares {
             draw_rectangle(
@@ -72,6 +85,18 @@ async fn main() {
 
         draw_circle(circle.x, circle.y, 16.0, circle.color);
 
+        if gameover {
+            const TEXT: &str = "GAME OVER!";
+            let text_dimensions = measure_text(TEXT, None, 50, 1.0);
+            draw_text(
+                TEXT,
+                screen_width() / 2.0 - text_dimensions.width / 2.0,
+                screen_height() / 2.0,
+                50.0,
+                RED,
+            );
+        }
+
         next_frame().await
     }
 }
@@ -82,4 +107,19 @@ struct Shape {
     x: f32,
     y: f32,
     color: Color,
+}
+
+impl Shape {
+    fn collides_with(&self, other: &Self) -> bool {
+        self.rect().overlaps(&other.rect())
+    }
+
+    fn rect(&self) -> Rect {
+        Rect {
+            x: self.x - self.size / 2.0,
+            y: self.y - self.size / 2.0,
+            w: self.size,
+            h: self.size,
+        }
+    }
 }
