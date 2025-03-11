@@ -3,21 +3,23 @@ use rand::ChooseRandom;
 
 const MOVEMENT_SPEED: f32 = 200.0;
 
-const COLOR_LIST: [Color; 22] = [
-    LIGHTGRAY, GRAY, DARKGRAY, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE,
-    BLUE, DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK, MAGENTA,
+const COLOR_LIST: [Color; 21] = [
+    LIGHTGRAY, GRAY, DARKGRAY, GOLD, ORANGE, PINK, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE,
+    DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK, MAGENTA,
 ];
 
 #[macroquad::main("My game")]
 async fn main() {
     let mut gameover = false;
     let mut squares = vec![];
+    let mut bullets = vec![];
     let mut circle = Shape {
         size: 32.0,
         speed: MOVEMENT_SPEED,
         x: screen_width() / 2.,
         y: screen_height() / 2.,
         color: YELLOW,
+        collided: false,
     };
 
     rand::srand(miniquad::date::now() as u64);
@@ -35,6 +37,7 @@ async fn main() {
                     x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
                     y: -size,
                     color: *COLOR_LIST.choose().unwrap(),
+                    collided: false,
                 });
             }
 
@@ -51,20 +54,48 @@ async fn main() {
                 circle.y -= circle_movement;
             }
 
+            if is_key_pressed(KeyCode::Space) {
+                bullets.push(Shape {
+                    size: 5.0,
+                    speed: circle.speed * 2.0,
+                    x: circle.x,
+                    y: circle.y,
+                    color: RED,
+                    collided: false,
+                });
+            }
+
             circle.x = clamp(circle.x, 0.0, screen_width());
             circle.y = clamp(circle.y, 0.0, screen_height());
 
             for square in &mut squares {
                 square.y += square.speed * delta_time;
             }
-
             squares.retain(|square| square.y < screen_height() + square.size);
+
+            for bullet in &mut bullets {
+                bullet.y -= bullet.speed * delta_time;
+            }
+            bullets.retain(|bullet| bullet.y > -bullet.size / 2.0);
+
+            for square in squares.iter_mut() {
+                for bullet in bullets.iter_mut() {
+                    if bullet.collides_with(square) {
+                        bullet.collided = true;
+                        square.collided = true;
+                    }
+                }
+            }
+
+            squares.retain(|square| !square.collided);
+            bullets.retain(|bullet| !bullet.collided);
 
             gameover = squares.iter().any(|square| circle.collides_with(square));
         }
 
-        if gameover && is_key_pressed(KeyCode::Space) {
+        if gameover && is_key_pressed(KeyCode::Enter) {
             squares.clear();
+            bullets.clear();
             circle.x = screen_width() / 2.0;
             circle.y = screen_height() / 2.0;
             gameover = false;
@@ -83,6 +114,9 @@ async fn main() {
             );
         }
 
+        for bullet in &bullets {
+            draw_circle(bullet.x, bullet.y, bullet.size / 2.0, RED);
+        }
         draw_circle(circle.x, circle.y, 16.0, circle.color);
 
         if gameover {
@@ -107,6 +141,7 @@ struct Shape {
     x: f32,
     y: f32,
     color: Color,
+    collided: bool,
 }
 
 impl Shape {
