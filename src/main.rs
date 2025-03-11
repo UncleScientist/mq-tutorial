@@ -13,9 +13,10 @@ const COLOR_LIST: [Color; 20] = [
 
 #[macroquad::main("My game")]
 async fn main() {
-    let mut highscore = 0u32;
+    let mut high_score = 0u32;
     let mut score = 0u32;
     let mut gameover = false;
+    let mut got_high_score = false;
     let mut squares = vec![];
     let mut bullets = vec![];
     let mut last_shot_time = get_time();
@@ -94,7 +95,10 @@ async fn main() {
                         bullet.collided = true;
                         square.collided = true;
                         score += square.size.round() as u32;
-                        highscore = highscore.max(score);
+                        if score > high_score {
+                            got_high_score = true;
+                            high_score = score;
+                        }
                     }
                 }
             }
@@ -111,6 +115,7 @@ async fn main() {
             circle.x = screen_width() / 2.0;
             circle.y = screen_height() / 2.0;
             gameover = false;
+            got_high_score = false;
             score = 0;
         }
 
@@ -133,19 +138,14 @@ async fn main() {
         draw_circle(circle.x, circle.y, 16.0, circle.color);
 
         if gameover {
-            const TEXT: &str = "GAME OVER!";
-            let text_dimensions = measure_text(TEXT, None, 50, 1.0);
-            draw_text(
-                TEXT,
-                screen_width() / 2.0 - text_dimensions.width / 2.0,
-                screen_height() / 2.0,
-                50.0,
-                RED,
-            );
+            draw_text_centered("GAME OVER!", 0.0);
+            if got_high_score {
+                draw_text_centered("NEW HIGH SCORE!", 1.0);
+            }
         }
 
         draw_text(format!("Score: {score}").as_str(), 10., 35., 25., WHITE);
-        let highscore_string = format!("High score: {highscore}");
+        let highscore_string = format!("High score: {high_score}");
         let highscore_text = highscore_string.as_str();
         let td = measure_text(highscore_text, None, 25, 1.0);
         draw_text(
@@ -158,6 +158,20 @@ async fn main() {
 
         next_frame().await
     }
+}
+
+fn draw_text_centered(text: &str, line: f32) {
+    const TEXT_HEIGHT: f32 = 50.0;
+
+    let td = measure_text(text, None, TEXT_HEIGHT as u16, 1.0);
+    let ypos = screen_height() / 2.0 + TEXT_HEIGHT * line;
+    draw_text(
+        text,
+        screen_width() / 2.0 - td.width / 2.0,
+        ypos,
+        TEXT_HEIGHT,
+        RED,
+    );
 }
 
 struct Shape {
