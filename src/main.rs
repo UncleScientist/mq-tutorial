@@ -6,13 +6,15 @@ const MOVEMENT_SPEED: f32 = 200.0;
 const MAX_BULLETS: usize = 7;
 const BULLET_COOLDOWN: f64 = 0.25;
 
-const COLOR_LIST: [Color; 21] = [
+const COLOR_LIST: [Color; 20] = [
     LIGHTGRAY, GRAY, DARKGRAY, GOLD, ORANGE, PINK, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE,
-    DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK, MAGENTA,
+    DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, BLACK, MAGENTA,
 ];
 
 #[macroquad::main("My game")]
 async fn main() {
+    let mut highscore = 0u32;
+    let mut score = 0u32;
     let mut gameover = false;
     let mut squares = vec![];
     let mut bullets = vec![];
@@ -91,6 +93,8 @@ async fn main() {
                     if bullet.collides_with(square) {
                         bullet.collided = true;
                         square.collided = true;
+                        score += square.size.round() as u32;
+                        highscore = highscore.max(score);
                     }
                 }
             }
@@ -107,6 +111,7 @@ async fn main() {
             circle.x = screen_width() / 2.0;
             circle.y = screen_height() / 2.0;
             gameover = false;
+            score = 0;
         }
 
         /* draw stuff from here on down */
@@ -138,6 +143,18 @@ async fn main() {
                 RED,
             );
         }
+
+        draw_text(format!("Score: {score}").as_str(), 10., 35., 25., WHITE);
+        let highscore_string = format!("High score: {highscore}");
+        let highscore_text = highscore_string.as_str();
+        let td = measure_text(highscore_text, None, 25, 1.0);
+        draw_text(
+            highscore_text,
+            screen_width() - td.width - 10.0,
+            35.,
+            25.,
+            WHITE,
+        );
 
         next_frame().await
     }
