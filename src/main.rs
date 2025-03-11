@@ -3,6 +3,9 @@ use rand::ChooseRandom;
 
 const MOVEMENT_SPEED: f32 = 200.0;
 
+const MAX_BULLETS: usize = 7;
+const BULLET_COOLDOWN: f64 = 0.25;
+
 const COLOR_LIST: [Color; 21] = [
     LIGHTGRAY, GRAY, DARKGRAY, GOLD, ORANGE, PINK, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE,
     DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BLACK, MAGENTA,
@@ -13,6 +16,7 @@ async fn main() {
     let mut gameover = false;
     let mut squares = vec![];
     let mut bullets = vec![];
+    let mut last_shot_time = get_time();
     let mut circle = Shape {
         size: 32.0,
         speed: MOVEMENT_SPEED,
@@ -54,7 +58,10 @@ async fn main() {
                 circle.y -= circle_movement;
             }
 
-            if is_key_pressed(KeyCode::Space) {
+            if last_shot_time + BULLET_COOLDOWN < get_time()
+                && bullets.len() < MAX_BULLETS
+                && is_key_pressed(KeyCode::Space)
+            {
                 bullets.push(Shape {
                     size: 5.0,
                     speed: circle.speed * 2.0,
@@ -63,6 +70,7 @@ async fn main() {
                     color: RED,
                     collided: false,
                 });
+                last_shot_time = get_time();
             }
 
             circle.x = clamp(circle.x, 0.0, screen_width());
