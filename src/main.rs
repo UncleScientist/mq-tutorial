@@ -1,5 +1,7 @@
 mod shader;
 
+use macroquad_particles::{self as particles, ColorCurve, Emitter, EmitterConfig};
+
 use macroquad::prelude::*;
 use rand::ChooseRandom;
 
@@ -21,6 +23,7 @@ async fn main() {
     let mut got_high_score = false;
     let mut squares = vec![];
     let mut bullets = vec![];
+    let mut explosions = vec![];
     let mut last_shot_time = get_time();
     let mut circle = Shape {
         size: 32.0,
@@ -125,12 +128,20 @@ async fn main() {
                             got_high_score = true;
                             high_score = score;
                         }
+                        explosions.push((
+                            Emitter::new(EmitterConfig {
+                                amount: square.size.round() as u32 * 2,
+                                ..particle_explosion()
+                            }),
+                            vec2(square.x, square.y),
+                        ));
                     }
                 }
             }
 
             squares.retain(|square| !square.collided);
             bullets.retain(|bullet| !bullet.collided);
+            explosions.retain(|(explosion, _)| explosion.config.emitting);
 
             if squares.iter().any(|square| circle.collides_with(square)) {
                 game_state = GameState::GameOver;
@@ -170,6 +181,10 @@ async fn main() {
         }
         draw_circle(circle.x, circle.y, 16.0, circle.color);
 
+        for (explosion, coords) in &mut explosions {
+            explosion.draw(*coords);
+        }
+
         draw_text(format!("Score: {score}").as_str(), 10., 35., 25., WHITE);
         let highscore_string = format!("High score: {high_score}");
         let highscore_text = highscore_string.as_str();
@@ -191,6 +206,7 @@ async fn main() {
                 if is_key_pressed(KeyCode::Enter) {
                     squares.clear();
                     bullets.clear();
+                    explosions.clear();
                     circle.x = screen_width() / 2.0;
                     circle.y = screen_height() / 2.0;
                     game_state = GameState::Playing;
@@ -237,6 +253,28 @@ fn draw_text_centered(text: &str, line: f32) {
     let y = baseline - td.offset_y;
     draw_rectangle(x, y - BORDER, td.width, td.height + 2. * BORDER, BLACK);
     draw_text(text, x, baseline, TEXT_HEIGHT, RED);
+}
+
+fn particle_explosion() -> particles::EmitterConfig {
+    particles::EmitterConfig {
+        local_coords: false,
+        one_shot: true,
+        emitting: true,
+        lifetime: 0.6,
+        lifetime_randomness: 0.3,
+        explosiveness: 0.65,
+        initial_direction_spread: 2.0 * std::f32::consts::PI,
+        initial_velocity: 300.0,
+        initial_velocity_randomness: 0.8,
+        size: 3.0,
+        size_randomness: 0.3,
+        colors_curve: ColorCurve {
+            start: RED,
+            mid: ORANGE,
+            end: YELLOW,
+        },
+        ..Default::default()
+    }
 }
 
 enum GameState {
