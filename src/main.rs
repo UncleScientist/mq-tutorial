@@ -10,7 +10,7 @@ const BULLET_COOLDOWN: f64 = 0.25;
 
 const COLOR_LIST: [Color; 20] = [
     LIGHTGRAY, GRAY, DARKGRAY, GOLD, ORANGE, PINK, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE,
-    DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, BLACK, MAGENTA,
+    DARKBLUE, VIOLET, PURPLE, BEIGE, BROWN, DARKBROWN, MAGENTA, DARKPURPLE,
 ];
 
 #[macroquad::main("My game")]
@@ -33,6 +33,23 @@ async fn main() {
 
     rand::srand(miniquad::date::now() as u64);
 
+    let mut direction_modifier: f32 = 0.0;
+    let render_target = render_target(320, 150); // width, height
+    let material = load_material(
+        ShaderSource::Glsl {
+            vertex: shader::VERTEX_SHADER,
+            fragment: shader::FRAGMENT_SHADER,
+        },
+        MaterialParams {
+            uniforms: vec![
+                UniformDesc::new("iResolution", UniformType::Float2),
+                UniformDesc::new("direction_modifier", UniformType::Float1),
+            ],
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
     loop {
         let delta_time = get_frame_time();
         let circle_movement = MOVEMENT_SPEED * delta_time;
@@ -53,9 +70,11 @@ async fn main() {
 
             if is_key_down(KeyCode::Right) {
                 circle.x += circle_movement;
+                direction_modifier += 0.05 * delta_time;
             }
             if is_key_down(KeyCode::Left) {
                 circle.x -= circle_movement;
+                direction_modifier -= 0.05 * delta_time;
             }
             if is_key_down(KeyCode::Down) {
                 circle.y += circle_movement;
@@ -119,7 +138,23 @@ async fn main() {
         }
 
         /* draw everything */
-        clear_background(DARKPURPLE);
+        clear_background(BLACK);
+
+        material.set_uniform("iResolution", (screen_width(), screen_height()));
+        material.set_uniform("direction_modifier", direction_modifier);
+        gl_use_material(&material);
+        draw_texture_ex(
+            &render_target.texture,
+            0.,
+            0.,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(vec2(screen_width(), screen_height())),
+                ..Default::default()
+            },
+        );
+        gl_use_default_material();
+
         for square in &squares {
             draw_rectangle(
                 square.x - square.size / 2.0,
@@ -193,16 +228,15 @@ async fn main() {
 
 fn draw_text_centered(text: &str, line: f32) {
     const TEXT_HEIGHT: f32 = 50.0;
+    const BORDER: f32 = 4.0;
 
     let td = measure_text(text, None, TEXT_HEIGHT as u16, 1.0);
     let ypos = screen_height() / 2.0 + TEXT_HEIGHT * line;
-    draw_text(
-        text,
-        screen_width() / 2.0 - td.width / 2.0,
-        ypos,
-        TEXT_HEIGHT,
-        RED,
-    );
+    let x = screen_width() / 2.0 - td.width / 2.0;
+    let baseline = ypos;
+    let y = baseline - td.offset_y;
+    draw_rectangle(x, y - BORDER, td.width, td.height + 2. * BORDER, BLACK);
+    draw_text(text, x, baseline, TEXT_HEIGHT, RED);
 }
 
 enum GameState {
