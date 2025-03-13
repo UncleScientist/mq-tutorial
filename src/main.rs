@@ -1,3 +1,5 @@
+mod shader;
+
 use macroquad::prelude::*;
 use rand::ChooseRandom;
 
