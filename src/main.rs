@@ -1,6 +1,6 @@
 mod shader;
 
-use macroquad_particles::{self as particles, ColorCurve, Emitter, EmitterConfig};
+use macroquad_particles::{self as particles, ColorCurve, Emitter};
 
 use macroquad::prelude::*;
 use rand::ChooseRandom;
@@ -9,6 +9,7 @@ const MOVEMENT_SPEED: f32 = 200.0;
 
 const MAX_BULLETS: usize = 7;
 const BULLET_COOLDOWN: f64 = 0.25;
+const SHIP_FLAME_COUNT: usize = 1;
 
 const COLOR_LIST: [Color; 20] = [
     LIGHTGRAY, GRAY, DARKGRAY, GOLD, ORANGE, PINK, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE,
@@ -25,6 +26,7 @@ async fn main() {
     let mut bullets = vec![];
     let mut explosions = vec![];
     let mut last_shot_time = get_time();
+    let mut flames = vec![];
     let mut circle = Shape {
         size: 32.0,
         speed: MOVEMENT_SPEED,
@@ -129,10 +131,10 @@ async fn main() {
                             high_score = score;
                         }
                         explosions.push((
-                            Emitter::new(EmitterConfig {
-                                amount: square.size.round() as u32 * 2,
-                                ..particle_explosion()
-                            }),
+                            Emitter::new(particle_explosion(
+                                square.size.round() as u32 * 2,
+                                ExplosionDirection::Circular,
+                            )),
                             vec2(square.x, square.y),
                         ));
                     }
@@ -179,6 +181,21 @@ async fn main() {
         for bullet in &bullets {
             draw_circle(bullet.x, bullet.y, bullet.size / 2.0, RED);
         }
+
+        if matches!(game_state, GameState::Playing) || !flames.is_empty() {
+            let ship_pos = vec2(circle.x, circle.y);
+            if matches!(game_state, GameState::Playing) && flames.len() < SHIP_FLAME_COUNT {
+                flames.push(Emitter::new(particle_explosion(
+                    200,
+                    ExplosionDirection::Below,
+                )));
+            }
+            for flame in &mut flames {
+                flame.config.one_shot = !matches!(game_state, GameState::Playing);
+                flame.draw(ship_pos);
+            }
+            flames.retain(|flame| flame.config.emitting);
+        }
         draw_circle(circle.x, circle.y, 16.0, circle.color);
 
         for (explosion, coords) in &mut explosions {
@@ -207,6 +224,7 @@ async fn main() {
                     squares.clear();
                     bullets.clear();
                     explosions.clear();
+                    flames.clear();
                     circle.x = screen_width() / 2.0;
                     circle.y = screen_height() / 2.0;
                     game_state = GameState::Playing;
@@ -255,15 +273,28 @@ fn draw_text_centered(text: &str, line: f32) {
     draw_text(text, x, baseline, TEXT_HEIGHT, RED);
 }
 
-fn particle_explosion() -> particles::EmitterConfig {
+enum ExplosionDirection {
+    Circular,
+    Below,
+}
+
+fn particle_explosion(amount: u32, dir: ExplosionDirection) -> particles::EmitterConfig {
     particles::EmitterConfig {
+        amount,
         local_coords: false,
-        one_shot: true,
+        one_shot: matches!(dir, ExplosionDirection::Circular),
         emitting: true,
         lifetime: 0.6,
         lifetime_randomness: 0.3,
         explosiveness: 0.65,
-        initial_direction_spread: 2.0 * std::f32::consts::PI,
+        initial_direction: match dir {
+            ExplosionDirection::Circular => vec2(0., -1.),
+            ExplosionDirection::Below => vec2(0., 1.),
+        },
+        initial_direction_spread: match dir {
+            ExplosionDirection::Circular => 2.0 * std::f32::consts::PI,
+            ExplosionDirection::Below => std::f32::consts::PI / 2.0,
+        },
         initial_velocity: 300.0,
         initial_velocity_randomness: 0.8,
         size: 3.0,
