@@ -35,8 +35,117 @@ async fn main() {
         let delta_time = get_frame_time();
         let circle_movement = MOVEMENT_SPEED * delta_time;
 
-        clear_background(DARKPURPLE);
+        // If we're actively playing, calculate the next frame
+        if matches!(game_state, GameState::Playing) {
+            if rand::gen_range(0, 99) >= 95 {
+                let size = rand::gen_range(16.0, 64.0);
+                squares.push(Shape {
+                    size,
+                    speed: rand::gen_range(50.0, 150.0),
+                    x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
+                    y: -size,
+                    color: *COLOR_LIST.choose().unwrap(),
+                    collided: false,
+                });
+            }
 
+            if is_key_down(KeyCode::Right) {
+                circle.x += circle_movement;
+            }
+            if is_key_down(KeyCode::Left) {
+                circle.x -= circle_movement;
+            }
+            if is_key_down(KeyCode::Down) {
+                circle.y += circle_movement;
+            }
+            if is_key_down(KeyCode::Up) {
+                circle.y -= circle_movement;
+            }
+
+            if last_shot_time + BULLET_COOLDOWN < get_time()
+                && bullets.len() < MAX_BULLETS
+                && is_key_pressed(KeyCode::Space)
+            {
+                bullets.push(Shape {
+                    size: 5.0,
+                    speed: circle.speed * 2.0,
+                    x: circle.x,
+                    y: circle.y,
+                    color: RED,
+                    collided: false,
+                });
+                last_shot_time = get_time();
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                game_state = GameState::Paused;
+            }
+
+            circle.x = clamp(circle.x, 0.0, screen_width());
+            circle.y = clamp(circle.y, 0.0, screen_height());
+
+            for square in &mut squares {
+                square.y += square.speed * delta_time;
+            }
+            squares.retain(|square| square.y < screen_height() + square.size);
+
+            for bullet in &mut bullets {
+                bullet.y -= bullet.speed * delta_time;
+            }
+            bullets.retain(|bullet| bullet.y > -bullet.size / 2.0);
+
+            for square in squares.iter_mut() {
+                for bullet in bullets.iter_mut() {
+                    if bullet.collides_with(square) {
+                        bullet.collided = true;
+                        square.collided = true;
+                        score += square.size.round() as u32;
+                        if score > high_score {
+                            got_high_score = true;
+                            high_score = score;
+                        }
+                    }
+                }
+            }
+
+            squares.retain(|square| !square.collided);
+            bullets.retain(|bullet| !bullet.collided);
+
+            if squares.iter().any(|square| circle.collides_with(square)) {
+                game_state = GameState::GameOver;
+            }
+        }
+
+        /* draw everything */
+        clear_background(DARKPURPLE);
+        for square in &squares {
+            draw_rectangle(
+                square.x - square.size / 2.0,
+                square.y - square.size / 2.0,
+                square.size,
+                square.size,
+                square.color,
+            );
+        }
+
+        for bullet in &bullets {
+            draw_circle(bullet.x, bullet.y, bullet.size / 2.0, RED);
+        }
+        draw_circle(circle.x, circle.y, 16.0, circle.color);
+
+        draw_text(format!("Score: {score}").as_str(), 10., 35., 25., WHITE);
+        let highscore_string = format!("High score: {high_score}");
+        let highscore_text = highscore_string.as_str();
+        let td = measure_text(highscore_text, None, 25, 1.0);
+        draw_text(
+            highscore_text,
+            screen_width() - td.width - 10.0,
+            35.,
+            25.,
+            WHITE,
+        );
+
+        /* check and handle key input in non-playing states */
         match game_state {
             GameState::MainMenu => {
                 if is_key_pressed(KeyCode::Escape) {
@@ -52,6 +161,7 @@ async fn main() {
                     score = 0;
                 }
 
+                draw_text_centered("Circles and Squares", -5.0);
                 draw_text_centered("Press ENTER", 0.0);
             }
             GameState::Paused => {
@@ -71,110 +181,7 @@ async fn main() {
             }
 
             GameState::Playing => {
-                if rand::gen_range(0, 99) >= 95 {
-                    let size = rand::gen_range(16.0, 64.0);
-                    squares.push(Shape {
-                        size,
-                        speed: rand::gen_range(50.0, 150.0),
-                        x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
-                        y: -size,
-                        color: *COLOR_LIST.choose().unwrap(),
-                        collided: false,
-                    });
-                }
-
-                if is_key_down(KeyCode::Right) {
-                    circle.x += circle_movement;
-                }
-                if is_key_down(KeyCode::Left) {
-                    circle.x -= circle_movement;
-                }
-                if is_key_down(KeyCode::Down) {
-                    circle.y += circle_movement;
-                }
-                if is_key_down(KeyCode::Up) {
-                    circle.y -= circle_movement;
-                }
-
-                if last_shot_time + BULLET_COOLDOWN < get_time()
-                    && bullets.len() < MAX_BULLETS
-                    && is_key_pressed(KeyCode::Space)
-                {
-                    bullets.push(Shape {
-                        size: 5.0,
-                        speed: circle.speed * 2.0,
-                        x: circle.x,
-                        y: circle.y,
-                        color: RED,
-                        collided: false,
-                    });
-                    last_shot_time = get_time();
-                }
-
-                if is_key_pressed(KeyCode::Escape) {
-                    game_state = GameState::Paused;
-                }
-
-                circle.x = clamp(circle.x, 0.0, screen_width());
-                circle.y = clamp(circle.y, 0.0, screen_height());
-
-                for square in &mut squares {
-                    square.y += square.speed * delta_time;
-                }
-                squares.retain(|square| square.y < screen_height() + square.size);
-
-                for bullet in &mut bullets {
-                    bullet.y -= bullet.speed * delta_time;
-                }
-                bullets.retain(|bullet| bullet.y > -bullet.size / 2.0);
-
-                for square in squares.iter_mut() {
-                    for bullet in bullets.iter_mut() {
-                        if bullet.collides_with(square) {
-                            bullet.collided = true;
-                            square.collided = true;
-                            score += square.size.round() as u32;
-                            if score > high_score {
-                                got_high_score = true;
-                                high_score = score;
-                            }
-                        }
-                    }
-                }
-
-                squares.retain(|square| !square.collided);
-                bullets.retain(|bullet| !bullet.collided);
-
-                if squares.iter().any(|square| circle.collides_with(square)) {
-                    game_state = GameState::GameOver;
-                }
-
-                for square in &squares {
-                    draw_rectangle(
-                        square.x - square.size / 2.0,
-                        square.y - square.size / 2.0,
-                        square.size,
-                        square.size,
-                        square.color,
-                    );
-                }
-
-                for bullet in &bullets {
-                    draw_circle(bullet.x, bullet.y, bullet.size / 2.0, RED);
-                }
-                draw_circle(circle.x, circle.y, 16.0, circle.color);
-
-                draw_text(format!("Score: {score}").as_str(), 10., 35., 25., WHITE);
-                let highscore_string = format!("High score: {high_score}");
-                let highscore_text = highscore_string.as_str();
-                let td = measure_text(highscore_text, None, 25, 1.0);
-                draw_text(
-                    highscore_text,
-                    screen_width() - td.width - 10.0,
-                    35.,
-                    25.,
-                    WHITE,
-                );
+                // Do nothing: all the work was done up above
             }
         }
 
