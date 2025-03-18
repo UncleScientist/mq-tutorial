@@ -33,7 +33,7 @@ async fn main() {
         speed: MOVEMENT_SPEED,
         x: screen_width() / 2.,
         y: screen_height() / 2.,
-        color: YELLOW,
+        _color: YELLOW,
         collided: false,
     };
 
@@ -51,6 +51,11 @@ async fn main() {
         .await
         .expect("Loading explosion png");
     explosion_texture.set_filter(FilterMode::Nearest);
+
+    let enemy_small_texture = load_texture("enemy-small.png")
+        .await
+        .expect("Loading enemy-small png");
+    enemy_small_texture.set_filter(FilterMode::Nearest);
 
     build_textures_atlas();
 
@@ -101,6 +106,18 @@ async fn main() {
         true,
     );
 
+    let mut enemy_small_sprite = AnimatedSprite::new(
+        17,
+        16,
+        &[Animation {
+            name: "enemy_small".into(),
+            row: 0,
+            frames: 2,
+            fps: 12,
+        }],
+        true,
+    );
+
     rand::srand(miniquad::date::now() as u64);
 
     let mut direction_modifier: f32 = 0.0;
@@ -133,7 +150,7 @@ async fn main() {
                     speed: rand::gen_range(50.0, 150.0),
                     x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
                     y: -size,
-                    color: *COLOR_LIST.choose().unwrap(),
+                    _color: *COLOR_LIST.choose().unwrap(),
                     collided: false,
                 });
             }
@@ -165,7 +182,7 @@ async fn main() {
                     speed: circle.speed * 2.0,
                     x: circle.x,
                     y: circle.y - 24.0,
-                    color: RED,
+                    _color: RED,
                     collided: false,
                 });
                 last_shot_time = get_time();
@@ -190,6 +207,7 @@ async fn main() {
 
             ship_sprite.update();
             bullet_sprite.update();
+            enemy_small_sprite.update();
 
             for square in squares.iter_mut() {
                 for bullet in bullets.iter_mut() {
@@ -243,13 +261,18 @@ async fn main() {
         );
         gl_use_default_material();
 
+        let enemy_frame = enemy_small_sprite.frame();
         for square in &squares {
-            draw_rectangle(
+            draw_texture_ex(
+                &enemy_small_texture,
                 square.x - square.size / 2.0,
                 square.y - square.size / 2.0,
-                square.size,
-                square.size,
-                square.color,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(vec2(square.size, square.size)),
+                    source: Some(enemy_frame.source_rect),
+                    ..Default::default()
+                },
             );
         }
 
@@ -422,7 +445,7 @@ struct Shape {
     speed: f32,
     x: f32,
     y: f32,
-    color: Color,
+    _color: Color,
     collided: bool,
 }
 
