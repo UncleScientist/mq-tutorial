@@ -28,14 +28,6 @@ async fn main() {
     let mut explosions = vec![];
     let mut last_shot_time = get_time();
     let mut flames = vec![];
-    let mut circle = Shape {
-        size: 32.0,
-        speed: MOVEMENT_SPEED,
-        x: screen_width() / 2.,
-        y: screen_height() / 2.,
-        _color: YELLOW,
-        collided: false,
-    };
 
     set_pc_assets_folder("assets");
 
@@ -57,7 +49,28 @@ async fn main() {
         .expect("Loading enemy-small png");
     enemy_small_texture.set_filter(FilterMode::Nearest);
 
+    let enemy_medium_texture = load_texture("enemy-medium.png")
+        .await
+        .expect("Loading enemy-medium png");
+    enemy_medium_texture.set_filter(FilterMode::Nearest);
+
+    let enemy_big_texture = load_texture("enemy-big.png")
+        .await
+        .expect("Loading enemy-big png");
+    enemy_big_texture.set_filter(FilterMode::Nearest);
+
     build_textures_atlas();
+
+    let mut circle = Shape {
+        size: 32.0,
+        speed: MOVEMENT_SPEED,
+        x: screen_width() / 2.,
+        y: screen_height() / 2.,
+        _color: YELLOW,
+        texture: &ship_texture,
+        idx: 0,
+        collided: false,
+    };
 
     let mut bullet_sprite = AnimatedSprite::new(
         16,
@@ -106,7 +119,7 @@ async fn main() {
         true,
     );
 
-    let mut enemy_small_sprite = AnimatedSprite::new(
+    let enemy_small_sprite = AnimatedSprite::new(
         17,
         16,
         &[Animation {
@@ -117,6 +130,34 @@ async fn main() {
         }],
         true,
     );
+
+    let enemy_medium_sprite = AnimatedSprite::new(
+        32,
+        16,
+        &[Animation {
+            name: "enemy_medium".into(),
+            row: 0,
+            frames: 2,
+            fps: 12,
+        }],
+        true,
+    );
+
+    let enemy_big_sprite = AnimatedSprite::new(
+        32,
+        32,
+        &[Animation {
+            name: "enemy_big".into(),
+            row: 0,
+            frames: 2,
+            fps: 12,
+        }],
+        true,
+    );
+
+    let mut enemy_sprites: [AnimatedSprite; 3] =
+        [enemy_small_sprite, enemy_medium_sprite, enemy_big_sprite];
+    let enemy_textures = [enemy_small_texture, enemy_medium_texture, enemy_big_texture];
 
     rand::srand(miniquad::date::now() as u64);
 
@@ -145,12 +186,21 @@ async fn main() {
         if matches!(game_state, GameState::Playing) {
             if rand::gen_range(0, 99) >= 95 {
                 let size = rand::gen_range(16.0, 64.0);
+                let idx = if size < 32. {
+                    0
+                } else if size < 48. {
+                    1
+                } else {
+                    2
+                };
                 squares.push(Shape {
                     size,
                     speed: rand::gen_range(50.0, 150.0),
                     x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
                     y: -size,
                     _color: *COLOR_LIST.choose().unwrap(),
+                    texture: &enemy_textures[idx],
+                    idx,
                     collided: false,
                 });
             }
@@ -183,6 +233,8 @@ async fn main() {
                     x: circle.x,
                     y: circle.y - 24.0,
                     _color: RED,
+                    texture: &bullet_texture,
+                    idx: 0,
                     collided: false,
                 });
                 last_shot_time = get_time();
@@ -207,7 +259,9 @@ async fn main() {
 
             ship_sprite.update();
             bullet_sprite.update();
-            enemy_small_sprite.update();
+            for enemy in &mut enemy_sprites {
+                enemy.update();
+            }
 
             for square in squares.iter_mut() {
                 for bullet in bullets.iter_mut() {
@@ -261,16 +315,16 @@ async fn main() {
         );
         gl_use_default_material();
 
-        let enemy_frame = enemy_small_sprite.frame();
+        let enemy_frames = enemy_sprites.iter().map(|e| e.frame()).collect::<Vec<_>>();
         for square in &squares {
             draw_texture_ex(
-                &enemy_small_texture,
+                square.texture,
                 square.x - square.size / 2.0,
                 square.y - square.size / 2.0,
                 WHITE,
                 DrawTextureParams {
                     dest_size: Some(vec2(square.size, square.size)),
-                    source: Some(enemy_frame.source_rect),
+                    source: Some(enemy_frames[square.idx].source_rect),
                     ..Default::default()
                 },
             );
@@ -279,7 +333,7 @@ async fn main() {
         let bullet_frame = bullet_sprite.frame();
         for bullet in &bullets {
             draw_texture_ex(
-                &bullet_texture,
+                bullet.texture,
                 bullet.x - bullet.size / 2.0,
                 bullet.y - bullet.size / 2.0,
                 WHITE,
@@ -313,7 +367,7 @@ async fn main() {
 
         let ship_frame = ship_sprite.frame();
         draw_texture_ex(
-            &ship_texture,
+            circle.texture,
             circle.x - ship_frame.dest_size.x,
             circle.y - ship_frame.dest_size.y,
             WHITE,
@@ -440,16 +494,18 @@ enum GameState {
     GameOver,
 }
 
-struct Shape {
+struct Shape<'a> {
     size: f32,
     speed: f32,
     x: f32,
     y: f32,
     _color: Color,
+    texture: &'a Texture2D,
+    idx: usize,
     collided: bool,
 }
 
-impl Shape {
+impl Shape<'_> {
     fn collides_with(&self, other: &Self) -> bool {
         self.rect().overlaps(&other.rect())
     }
