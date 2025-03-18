@@ -1,5 +1,6 @@
 mod shader;
 
+use macroquad::experimental::animation::{AnimatedSprite, Animation};
 use macroquad_particles::{self as particles, ColorCurve, Emitter};
 
 use macroquad::prelude::*;
@@ -35,6 +36,63 @@ async fn main() {
         color: YELLOW,
         collided: false,
     };
+
+    set_pc_assets_folder("assets");
+
+    let ship_texture = load_texture("ship.png").await.expect("Loading ship png");
+    ship_texture.set_filter(FilterMode::Nearest);
+    let bullet_texture = load_texture("laser-bolts.png")
+        .await
+        .expect("Loading bullet png");
+    bullet_texture.set_filter(FilterMode::Nearest);
+    build_textures_atlas();
+
+    let mut bullet_sprite = AnimatedSprite::new(
+        16,
+        16,
+        &[
+            Animation {
+                name: "bullet".into(),
+                row: 0,
+                frames: 2,
+                fps: 12,
+            },
+            Animation {
+                name: "bolt".into(),
+                row: 1,
+                frames: 2,
+                fps: 12,
+            },
+        ],
+        true,
+    );
+    bullet_sprite.set_animation(1);
+
+    let mut ship_sprite = AnimatedSprite::new(
+        16,
+        24,
+        &[
+            Animation {
+                name: "idle".into(),
+                row: 0,
+                frames: 2,
+                fps: 12,
+            },
+            Animation {
+                name: "left".into(),
+                row: 2,
+                frames: 2,
+                fps: 12,
+            },
+            Animation {
+                name: "right".into(),
+                row: 4,
+                frames: 2,
+                fps: 12,
+            },
+        ],
+        true,
+    );
 
     rand::srand(miniquad::date::now() as u64);
 
@@ -73,13 +131,16 @@ async fn main() {
                 });
             }
 
+            ship_sprite.set_animation(0);
             if is_key_down(KeyCode::Right) {
                 circle.x += circle_movement;
                 direction_modifier += 0.05 * delta_time;
+                ship_sprite.set_animation(2);
             }
             if is_key_down(KeyCode::Left) {
                 circle.x -= circle_movement;
                 direction_modifier -= 0.05 * delta_time;
+                ship_sprite.set_animation(1);
             }
             if is_key_down(KeyCode::Down) {
                 circle.y += circle_movement;
@@ -93,10 +154,10 @@ async fn main() {
                 && is_key_pressed(KeyCode::Space)
             {
                 bullets.push(Shape {
-                    size: 5.0,
+                    size: 32.0,
                     speed: circle.speed * 2.0,
                     x: circle.x,
-                    y: circle.y,
+                    y: circle.y - 24.0,
                     color: RED,
                     collided: false,
                 });
@@ -119,6 +180,9 @@ async fn main() {
                 bullet.y -= bullet.speed * delta_time;
             }
             bullets.retain(|bullet| bullet.y > -bullet.size / 2.0);
+
+            ship_sprite.update();
+            bullet_sprite.update();
 
             for square in squares.iter_mut() {
                 for bullet in bullets.iter_mut() {
@@ -178,8 +242,20 @@ async fn main() {
             );
         }
 
+        let bullet_frame = bullet_sprite.frame();
         for bullet in &bullets {
-            draw_circle(bullet.x, bullet.y, bullet.size / 2.0, RED);
+            draw_texture_ex(
+                &bullet_texture,
+                bullet.x - bullet.size / 2.0,
+                bullet.y - bullet.size / 2.0,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(vec2(bullet.size, bullet.size)),
+                    source: Some(bullet_frame.source_rect),
+                    ..Default::default()
+                },
+            );
+            // draw_circle(bullet.x, bullet.y, bullet.size / 2.0, RED);
         }
 
         if matches!(game_state, GameState::Playing) || !flames.is_empty() {
@@ -196,7 +272,20 @@ async fn main() {
             }
             flames.retain(|flame| flame.config.emitting);
         }
-        draw_circle(circle.x, circle.y, 16.0, circle.color);
+
+        let ship_frame = ship_sprite.frame();
+        draw_texture_ex(
+            &ship_texture,
+            circle.x - ship_frame.dest_size.x,
+            circle.y - ship_frame.dest_size.y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(ship_frame.dest_size * 2.0),
+                source: Some(ship_frame.source_rect),
+                ..Default::default()
+            },
+        );
+        // draw_circle(circle.x, circle.y, 16.0, circle.color);
 
         for (explosion, coords) in &mut explosions {
             explosion.draw(*coords);
