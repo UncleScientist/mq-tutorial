@@ -1,7 +1,7 @@
 mod shader;
 
 use macroquad::experimental::animation::{AnimatedSprite, Animation};
-use macroquad_particles::{self as particles, ColorCurve, Emitter};
+use macroquad_particles::{self as particles, AtlasConfig, ColorCurve, Emitter, EmitterConfig};
 
 use macroquad::prelude::*;
 use rand::ChooseRandom;
@@ -41,10 +41,17 @@ async fn main() {
 
     let ship_texture = load_texture("ship.png").await.expect("Loading ship png");
     ship_texture.set_filter(FilterMode::Nearest);
+
     let bullet_texture = load_texture("laser-bolts.png")
         .await
         .expect("Loading bullet png");
     bullet_texture.set_filter(FilterMode::Nearest);
+
+    let explosion_texture = load_texture("explosion.png")
+        .await
+        .expect("Loading explosion png");
+    explosion_texture.set_filter(FilterMode::Nearest);
+
     build_textures_atlas();
 
     let mut bullet_sprite = AnimatedSprite::new(
@@ -195,10 +202,14 @@ async fn main() {
                             high_score = score;
                         }
                         explosions.push((
-                            Emitter::new(particle_explosion(
-                                square.size.round() as u32 * 2,
-                                ExplosionDirection::Circular,
-                            )),
+                            Emitter::new(EmitterConfig {
+                                texture: Some(explosion_texture.clone()),
+                                atlas: Some(AtlasConfig::new(5, 1, 0..)),
+                                ..particle_explosion(
+                                    square.size.round() as u32 * 4,
+                                    ExplosionDirection::Circular,
+                                )
+                            }),
                             vec2(square.x, square.y),
                         ));
                     }
@@ -261,10 +272,14 @@ async fn main() {
         if matches!(game_state, GameState::Playing) || !flames.is_empty() {
             let ship_pos = vec2(circle.x, circle.y);
             if matches!(game_state, GameState::Playing) && flames.len() < SHIP_FLAME_COUNT {
-                flames.push(Emitter::new(particle_explosion(
-                    200,
-                    ExplosionDirection::Below,
-                )));
+                flames.push(Emitter::new(EmitterConfig {
+                    colors_curve: ColorCurve {
+                        start: RED,
+                        mid: ORANGE,
+                        end: YELLOW,
+                    },
+                    ..particle_explosion(200, ExplosionDirection::Below)
+                }));
             }
             for flame in &mut flames {
                 flame.config.one_shot = !matches!(game_state, GameState::Playing);
@@ -384,15 +399,13 @@ fn particle_explosion(amount: u32, dir: ExplosionDirection) -> particles::Emitte
             ExplosionDirection::Circular => 2.0 * std::f32::consts::PI,
             ExplosionDirection::Below => std::f32::consts::PI / 2.0,
         },
-        initial_velocity: 300.0,
+        initial_velocity: 400.0,
         initial_velocity_randomness: 0.8,
-        size: 3.0,
-        size_randomness: 0.3,
-        colors_curve: ColorCurve {
-            start: RED,
-            mid: ORANGE,
-            end: YELLOW,
+        size: match dir {
+            ExplosionDirection::Circular => 16.0,
+            ExplosionDirection::Below => 3.0,
         },
+        size_randomness: 0.3,
         ..Default::default()
     }
 }
