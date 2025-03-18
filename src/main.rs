@@ -1,5 +1,6 @@
 mod shader;
 
+use macroquad::audio::{load_sound, play_sound, play_sound_once, PlaySoundParams};
 use macroquad::experimental::animation::{AnimatedSprite, Animation};
 use macroquad_particles::{self as particles, AtlasConfig, ColorCurve, Emitter, EmitterConfig};
 
@@ -30,6 +31,10 @@ async fn main() {
     let mut flames = vec![];
 
     set_pc_assets_folder("assets");
+
+    let theme_music = load_sound("8bit-spaceshooter.ogg").await.unwrap();
+    let sound_explosion = load_sound("explosion.wav").await.unwrap();
+    let sound_laser = load_sound("laser.wav").await.unwrap();
 
     let ship_texture = load_texture("ship.png").await.expect("Loading ship png");
     ship_texture.set_filter(FilterMode::Nearest);
@@ -178,6 +183,14 @@ async fn main() {
     )
     .unwrap();
 
+    play_sound(
+        &theme_music,
+        PlaySoundParams {
+            looped: true,
+            volume: 1.,
+        },
+    );
+
     loop {
         let delta_time = get_frame_time();
         let circle_movement = MOVEMENT_SPEED * delta_time;
@@ -238,6 +251,7 @@ async fn main() {
                     collided: false,
                 });
                 last_shot_time = get_time();
+                play_sound_once(&sound_laser);
             }
 
             if is_key_pressed(KeyCode::Escape) {
@@ -284,6 +298,7 @@ async fn main() {
                             }),
                             vec2(square.x, square.y),
                         ));
+                        play_sound_once(&sound_explosion);
                     }
                 }
             }
