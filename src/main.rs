@@ -1,16 +1,14 @@
+mod resources;
 mod shader;
 
-use std::fmt::Debug;
-
-use macroquad::audio::{
-    load_sound, play_sound, play_sound_once, set_sound_volume, PlaySoundParams,
-};
+use macroquad::audio::{play_sound, play_sound_once, set_sound_volume, PlaySoundParams};
 use macroquad::experimental::animation::{AnimatedSprite, Animation};
-use macroquad::ui::{hash, root_ui, Skin, StyleBuilder};
+use macroquad::ui::{hash, root_ui};
 use macroquad_particles::{self as particles, AtlasConfig, ColorCurve, Emitter, EmitterConfig};
 
 use macroquad::prelude::*;
 use rand::ChooseRandom;
+use resources::Resources;
 
 const PLAYING_SOUND_VOLUME: f32 = 0.3;
 const PAUSED_SOUND_VOLUME: f32 = 0.1;
@@ -27,7 +25,7 @@ const COLOR_LIST: [Color; 20] = [
 ];
 
 #[macroquad::main("My game")]
-async fn main() {
+async fn main() -> Result<(), macroquad::Error> {
     let mut high_score = 0u32;
     let mut score = 0u32;
     let mut game_state = GameState::MainMenu;
@@ -39,25 +37,7 @@ async fn main() {
     let mut flames = vec![];
 
     set_pc_assets_folder("assets");
-
-    let theme_music = load_sound("8bit-spaceshooter.ogg").await.unwrap();
-    let sound_explosion = load_sound("explosion.wav").await.unwrap();
-    let sound_laser = load_sound("laser.wav").await.unwrap();
-
-    let ship_texture = load_texture_from_file("ship.png").await;
-    let bullet_texture = load_texture_from_file("laser-bolts.png").await;
-    let explosion_texture = load_texture_from_file("explosion.png").await;
-    let enemy_small_texture = load_texture_from_file("enemy-small.png").await;
-    let enemy_medium_texture = load_texture_from_file("enemy-medium.png").await;
-    let enemy_big_texture = load_texture_from_file("enemy-big.png").await;
-    let window_background = load_image_from_file("window_background.png").await;
-    let button_background = load_image_from_file("button_background.png").await;
-    let button_clicked_background = load_image_from_file("button_clicked_background.png").await;
-    let font = load_file("atari_games.ttf")
-        .await
-        .expect("Could not load font");
-
-    build_textures_atlas();
+    let resources = Resources::new().await?;
 
     let mut circle = Shape {
         size: 32.0,
@@ -65,7 +45,7 @@ async fn main() {
         x: screen_width() / 2.,
         y: screen_height() / 2.,
         _color: YELLOW,
-        texture: &ship_texture,
+        texture: &resources.ship_texture,
         idx: 0,
         collided: false,
     };
@@ -155,7 +135,11 @@ async fn main() {
 
     let mut enemy_sprites: [AnimatedSprite; 3] =
         [enemy_small_sprite, enemy_medium_sprite, enemy_big_sprite];
-    let enemy_textures = [enemy_small_texture, enemy_medium_texture, enemy_big_texture];
+    let enemy_textures = [
+        resources.enemy_small_texture,
+        resources.enemy_medium_texture,
+        resources.enemy_big_texture,
+    ];
 
     rand::srand(miniquad::date::now() as u64);
 
@@ -173,43 +157,18 @@ async fn main() {
             ],
             ..Default::default()
         },
-    )
-    .unwrap();
+    )?;
 
     play_sound(
-        &theme_music,
+        &resources.theme_music,
         PlaySoundParams {
             looped: true,
             volume: 1.,
         },
     );
-    set_sound_volume(&theme_music, PAUSED_SOUND_VOLUME);
+    set_sound_volume(&resources.theme_music, PAUSED_SOUND_VOLUME);
 
-    let window_style = root_ui()
-        .style_builder()
-        .background(window_background)
-        .background_margin(RectOffset::new(32.0, 76.0, 44.0, 20.0))
-        .margin(RectOffset::new(0.0, -40.0, 0.0, 0.0))
-        .build();
-
-    let button_style = root_ui()
-        .style_builder()
-        .background(button_background)
-        .background_clicked(button_clicked_background)
-        .background_margin(RectOffset::new(16.0, 16.0, 16.0, 16.0))
-        .margin(RectOffset::new(16.0, 0.0, -8.0, -8.0))
-        .set_font(&font, 64)
-        .build();
-
-    let label_style = root_ui().style_builder().set_font(&font, 28).build();
-
-    let ui_skin = Skin {
-        window_style,
-        button_style,
-        label_style,
-        ..root_ui().default_skin()
-    };
-    root_ui().push_skin(&ui_skin);
+    root_ui().push_skin(&resources.ui_skin);
     let window_size = vec2(370.0, 320.0);
 
     loop {
@@ -267,18 +226,18 @@ async fn main() {
                     x: circle.x,
                     y: circle.y - 24.0,
                     _color: RED,
-                    texture: &bullet_texture,
+                    texture: &resources.bullet_texture,
                     idx: 0,
                     collided: false,
                 });
                 last_shot_time = get_time();
-                play_sound_once(&sound_laser);
-                set_sound_volume(&sound_laser, 0.4);
+                play_sound_once(&resources.sound_laser);
+                set_sound_volume(&resources.sound_laser, 0.4);
             }
 
             if is_key_pressed(KeyCode::Escape) {
                 game_state = GameState::Paused;
-                set_sound_volume(&theme_music, PAUSED_SOUND_VOLUME);
+                set_sound_volume(&resources.theme_music, PAUSED_SOUND_VOLUME);
             }
 
             circle.x = clamp(circle.x, 0.0, screen_width());
@@ -312,7 +271,7 @@ async fn main() {
                         }
                         explosions.push((
                             Emitter::new(EmitterConfig {
-                                texture: Some(explosion_texture.clone()),
+                                texture: Some(resources.explosion_texture.clone()),
                                 atlas: Some(AtlasConfig::new(5, 1, 0..)),
                                 ..particle_explosion(
                                     square.size.round() as u32 * 4,
@@ -321,8 +280,8 @@ async fn main() {
                             }),
                             vec2(square.x, square.y),
                         ));
-                        play_sound_once(&sound_explosion);
-                        set_sound_volume(&sound_explosion, 0.4);
+                        play_sound_once(&resources.sound_explosion);
+                        set_sound_volume(&resources.sound_explosion, 0.4);
                     }
                 }
             }
@@ -333,6 +292,7 @@ async fn main() {
 
             if squares.iter().any(|square| circle.collides_with(square)) {
                 game_state = GameState::GameOver;
+                set_sound_volume(&resources.theme_music, PAUSED_SOUND_VOLUME);
             }
         }
 
@@ -456,7 +416,7 @@ async fn main() {
                             game_state = GameState::Playing;
                             got_high_score = false;
                             score = 0;
-                            set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
+                            set_sound_volume(&resources.theme_music, PLAYING_SOUND_VOLUME);
                         }
                         if ui.button(vec2(65.0, 125.0), "Quit") {
                             std::process::exit(0);
@@ -476,7 +436,7 @@ async fn main() {
                         ui.label(vec2(80.0, -34.0), "Paused");
                         if ui.button(vec2(40.0, 25.0), "Resume") {
                             game_state = GameState::Playing;
-                            set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
+                            set_sound_volume(&resources.theme_music, PLAYING_SOUND_VOLUME);
                         }
                     },
                 );
@@ -576,29 +536,5 @@ impl Shape<'_> {
             w: self.size,
             h: self.size,
         }
-    }
-}
-
-async fn load_texture_from_file<P: Debug + AsRef<str>>(path: P) -> Texture2D {
-    let texture = load_texture(path.as_ref())
-        .await
-        .unwrap_or_else(|_| panic!("Could not load {path:?}"));
-    texture.set_filter(FilterMode::Nearest);
-    texture
-}
-
-async fn load_image_from_file<P: Debug + AsRef<str>>(path: P) -> Image {
-    load_image(path.as_ref())
-        .await
-        .unwrap_or_else(|_| panic!("Could not load {path:?}"))
-}
-
-trait FontSetter {
-    fn set_font(self, font: &[u8], size: u16) -> Self;
-}
-
-impl FontSetter for StyleBuilder {
-    fn set_font(self, font: &[u8], size: u16) -> Self {
-        self.font(font).unwrap().text_color(WHITE).font_size(size)
     }
 }
