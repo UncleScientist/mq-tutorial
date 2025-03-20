@@ -465,11 +465,21 @@ async fn main() {
                 );
             }
             GameState::Paused => {
-                if is_key_pressed(KeyCode::Enter) {
-                    game_state = GameState::Playing;
-                    set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
-                }
-                draw_text_centered("Paused", 0.0);
+                root_ui().window(
+                    hash!(),
+                    vec2(
+                        screen_width() / 2.0 - window_size.x / 2.0,
+                        screen_height() / 2.0 - window_size.y / 2.0,
+                    ),
+                    window_size,
+                    |ui| {
+                        ui.label(vec2(80.0, -34.0), "Paused");
+                        if ui.button(vec2(40.0, 25.0), "Resume") {
+                            game_state = GameState::Playing;
+                            set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
+                        }
+                    },
+                );
             }
             GameState::GameOver => {
                 if is_key_pressed(KeyCode::Enter) {
