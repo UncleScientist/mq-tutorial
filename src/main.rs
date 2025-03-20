@@ -1,11 +1,16 @@
 mod shader;
 
-use macroquad::audio::{load_sound, play_sound, play_sound_once, PlaySoundParams};
+use macroquad::audio::{
+    load_sound, play_sound, play_sound_once, set_sound_volume, PlaySoundParams,
+};
 use macroquad::experimental::animation::{AnimatedSprite, Animation};
 use macroquad_particles::{self as particles, AtlasConfig, ColorCurve, Emitter, EmitterConfig};
 
 use macroquad::prelude::*;
 use rand::ChooseRandom;
+
+const PLAYING_SOUND_VOLUME: f32 = 0.3;
+const PAUSED_SOUND_VOLUME: f32 = 0.1;
 
 const MOVEMENT_SPEED: f32 = 200.0;
 
@@ -190,6 +195,7 @@ async fn main() {
             volume: 1.,
         },
     );
+    set_sound_volume(&theme_music, PAUSED_SOUND_VOLUME);
 
     loop {
         let delta_time = get_frame_time();
@@ -256,6 +262,7 @@ async fn main() {
 
             if is_key_pressed(KeyCode::Escape) {
                 game_state = GameState::Paused;
+                set_sound_volume(&theme_music, PAUSED_SOUND_VOLUME);
             }
 
             circle.x = clamp(circle.x, 0.0, screen_width());
@@ -426,6 +433,7 @@ async fn main() {
                     game_state = GameState::Playing;
                     got_high_score = false;
                     score = 0;
+                    set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
                 }
 
                 draw_text_centered("Circles and Squares", -5.0);
@@ -434,6 +442,7 @@ async fn main() {
             GameState::Paused => {
                 if is_key_pressed(KeyCode::Enter) {
                     game_state = GameState::Playing;
+                    set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
                 }
                 draw_text_centered("Paused", 0.0);
             }
