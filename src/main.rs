@@ -1,9 +1,12 @@
 mod shader;
 
+use std::fmt::Debug;
+
 use macroquad::audio::{
     load_sound, play_sound, play_sound_once, set_sound_volume, PlaySoundParams,
 };
 use macroquad::experimental::animation::{AnimatedSprite, Animation};
+use macroquad::ui::{hash, root_ui, Skin, StyleBuilder};
 use macroquad_particles::{self as particles, AtlasConfig, ColorCurve, Emitter, EmitterConfig};
 
 use macroquad::prelude::*;
@@ -41,33 +44,18 @@ async fn main() {
     let sound_explosion = load_sound("explosion.wav").await.unwrap();
     let sound_laser = load_sound("laser.wav").await.unwrap();
 
-    let ship_texture = load_texture("ship.png").await.expect("Loading ship png");
-    ship_texture.set_filter(FilterMode::Nearest);
-
-    let bullet_texture = load_texture("laser-bolts.png")
+    let ship_texture = load_texture_from_file("ship.png").await;
+    let bullet_texture = load_texture_from_file("laser-bolts.png").await;
+    let explosion_texture = load_texture_from_file("explosion.png").await;
+    let enemy_small_texture = load_texture_from_file("enemy-small.png").await;
+    let enemy_medium_texture = load_texture_from_file("enemy-medium.png").await;
+    let enemy_big_texture = load_texture_from_file("enemy-big.png").await;
+    let window_background = load_image_from_file("window_background.png").await;
+    let button_background = load_image_from_file("button_background.png").await;
+    let button_clicked_background = load_image_from_file("button_clicked_background.png").await;
+    let font = load_file("atari_games.ttf")
         .await
-        .expect("Loading bullet png");
-    bullet_texture.set_filter(FilterMode::Nearest);
-
-    let explosion_texture = load_texture("explosion.png")
-        .await
-        .expect("Loading explosion png");
-    explosion_texture.set_filter(FilterMode::Nearest);
-
-    let enemy_small_texture = load_texture("enemy-small.png")
-        .await
-        .expect("Loading enemy-small png");
-    enemy_small_texture.set_filter(FilterMode::Nearest);
-
-    let enemy_medium_texture = load_texture("enemy-medium.png")
-        .await
-        .expect("Loading enemy-medium png");
-    enemy_medium_texture.set_filter(FilterMode::Nearest);
-
-    let enemy_big_texture = load_texture("enemy-big.png")
-        .await
-        .expect("Loading enemy-big png");
-    enemy_big_texture.set_filter(FilterMode::Nearest);
+        .expect("Could not load font");
 
     build_textures_atlas();
 
@@ -197,6 +185,33 @@ async fn main() {
     );
     set_sound_volume(&theme_music, PAUSED_SOUND_VOLUME);
 
+    let window_style = root_ui()
+        .style_builder()
+        .background(window_background)
+        .background_margin(RectOffset::new(32.0, 76.0, 44.0, 20.0))
+        .margin(RectOffset::new(0.0, -40.0, 0.0, 0.0))
+        .build();
+
+    let button_style = root_ui()
+        .style_builder()
+        .background(button_background)
+        .background_clicked(button_clicked_background)
+        .background_margin(RectOffset::new(16.0, 16.0, 16.0, 16.0))
+        .margin(RectOffset::new(16.0, 0.0, -8.0, -8.0))
+        .set_font(&font, 64)
+        .build();
+
+    let label_style = root_ui().style_builder().set_font(&font, 28).build();
+
+    let ui_skin = Skin {
+        window_style,
+        button_style,
+        label_style,
+        ..root_ui().default_skin()
+    };
+    root_ui().push_skin(&ui_skin);
+    let window_size = vec2(370.0, 320.0);
+
     loop {
         let delta_time = get_frame_time();
         let circle_movement = MOVEMENT_SPEED * delta_time;
@@ -258,6 +273,7 @@ async fn main() {
                 });
                 last_shot_time = get_time();
                 play_sound_once(&sound_laser);
+                set_sound_volume(&sound_laser, 0.4);
             }
 
             if is_key_pressed(KeyCode::Escape) {
@@ -306,6 +322,7 @@ async fn main() {
                             vec2(square.x, square.y),
                         ));
                         play_sound_once(&sound_explosion);
+                        set_sound_volume(&sound_explosion, 0.4);
                     }
                 }
             }
@@ -420,24 +437,32 @@ async fn main() {
         /* check and handle key input in non-playing states */
         match game_state {
             GameState::MainMenu => {
-                if is_key_pressed(KeyCode::Escape) {
-                    std::process::exit(0);
-                }
-                if is_key_pressed(KeyCode::Enter) {
-                    squares.clear();
-                    bullets.clear();
-                    explosions.clear();
-                    flames.clear();
-                    circle.x = screen_width() / 2.0;
-                    circle.y = screen_height() / 2.0;
-                    game_state = GameState::Playing;
-                    got_high_score = false;
-                    score = 0;
-                    set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
-                }
-
-                draw_text_centered("Circles and Squares", -5.0);
-                draw_text_centered("Press ENTER", 0.0);
+                root_ui().window(
+                    hash!(),
+                    vec2(
+                        screen_width() / 2.0 - window_size.x / 2.0,
+                        screen_height() / 2.0 - window_size.y / 2.0,
+                    ),
+                    window_size,
+                    |ui| {
+                        ui.label(vec2(80.0, -34.0), "Main Menu");
+                        if ui.button(vec2(65.0, 25.0), "Play") {
+                            squares.clear();
+                            bullets.clear();
+                            explosions.clear();
+                            flames.clear();
+                            circle.x = screen_width() / 2.0;
+                            circle.y = screen_height() / 2.0;
+                            game_state = GameState::Playing;
+                            got_high_score = false;
+                            score = 0;
+                            set_sound_volume(&theme_music, PLAYING_SOUND_VOLUME);
+                        }
+                        if ui.button(vec2(65.0, 125.0), "Quit") {
+                            std::process::exit(0);
+                        }
+                    },
+                );
             }
             GameState::Paused => {
                 if is_key_pressed(KeyCode::Enter) {
@@ -541,5 +566,29 @@ impl Shape<'_> {
             w: self.size,
             h: self.size,
         }
+    }
+}
+
+async fn load_texture_from_file<P: Debug + AsRef<str>>(path: P) -> Texture2D {
+    let texture = load_texture(path.as_ref())
+        .await
+        .unwrap_or_else(|_| panic!("Could not load {path:?}"));
+    texture.set_filter(FilterMode::Nearest);
+    texture
+}
+
+async fn load_image_from_file<P: Debug + AsRef<str>>(path: P) -> Image {
+    load_image(path.as_ref())
+        .await
+        .unwrap_or_else(|_| panic!("Could not load {path:?}"))
+}
+
+trait FontSetter {
+    fn set_font(self, font: &[u8], size: u16) -> Self;
+}
+
+impl FontSetter for StyleBuilder {
+    fn set_font(self, font: &[u8], size: u16) -> Self {
+        self.font(font).unwrap().text_color(WHITE).font_size(size)
     }
 }
