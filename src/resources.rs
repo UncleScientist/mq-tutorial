@@ -1,10 +1,13 @@
 use macroquad::{
     audio::{load_sound, Sound},
-    color::WHITE,
+    color::{BLACK, WHITE},
     file::load_file,
     math::RectOffset,
+    prelude::{collections::storage, coroutines::start_coroutine},
     texture::{build_textures_atlas, load_image, load_texture, FilterMode, Texture2D},
+    time::get_time,
     ui::{root_ui, Skin, StyleBuilder},
+    window::{clear_background, next_frame},
 };
 
 pub struct Resources {
@@ -75,6 +78,27 @@ impl Resources {
             sound_laser,
             ui_skin,
         })
+    }
+
+    pub async fn load() -> Result<(), macroquad::Error> {
+        let resources_loading = start_coroutine(async move {
+            let resources = Resources::new().await.unwrap();
+            storage::store(resources);
+        });
+
+        while !resources_loading.is_done() {
+            clear_background(BLACK);
+            crate::draw_text_centered(
+                &format!(
+                    "Loading resources {}",
+                    ".".repeat(((get_time() * 2.0) as usize) % 4)
+                ),
+                0.0,
+            );
+            next_frame().await;
+        }
+
+        Ok(())
     }
 }
 

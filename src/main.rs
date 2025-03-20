@@ -1,6 +1,7 @@
 mod resources;
 mod shader;
 
+use collections::storage;
 use macroquad::audio::{play_sound, play_sound_once, set_sound_volume, PlaySoundParams};
 use macroquad::experimental::animation::{AnimatedSprite, Animation};
 use macroquad::ui::{hash, root_ui};
@@ -37,7 +38,8 @@ async fn main() -> Result<(), macroquad::Error> {
     let mut flames = vec![];
 
     set_pc_assets_folder("assets");
-    let resources = Resources::new().await?;
+    Resources::load().await?;
+    let resources = storage::get::<Resources>();
 
     let mut circle = Shape {
         size: 32.0,
@@ -136,9 +138,9 @@ async fn main() -> Result<(), macroquad::Error> {
     let mut enemy_sprites: [AnimatedSprite; 3] =
         [enemy_small_sprite, enemy_medium_sprite, enemy_big_sprite];
     let enemy_textures = [
-        resources.enemy_small_texture,
-        resources.enemy_medium_texture,
-        resources.enemy_big_texture,
+        &resources.enemy_small_texture,
+        &resources.enemy_medium_texture,
+        &resources.enemy_big_texture,
     ];
 
     rand::srand(miniquad::date::now() as u64);
@@ -192,7 +194,7 @@ async fn main() -> Result<(), macroquad::Error> {
                     x: rand::gen_range(size / 2.0, screen_width() - size / 2.0),
                     y: -size,
                     _color: *COLOR_LIST.choose().unwrap(),
-                    texture: &enemy_textures[idx],
+                    texture: enemy_textures[idx],
                     idx,
                     collided: false,
                 });
@@ -460,7 +462,7 @@ async fn main() -> Result<(), macroquad::Error> {
     }
 }
 
-fn draw_text_centered(text: &str, line: f32) {
+pub fn draw_text_centered(text: &str, line: f32) {
     const TEXT_HEIGHT: f32 = 50.0;
     const BORDER: f32 = 4.0;
 
